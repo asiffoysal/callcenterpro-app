@@ -1,51 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/agent_store.dart';
+import '../core/fmt.dart';
 import '../core/session.dart';
 import '../theme/app_theme.dart';
+import '../widgets/common.dart';
 
-class CallsScreen extends StatelessWidget {
+class CallsScreen extends StatefulWidget {
   const CallsScreen({super.key, required this.session});
   final AppSession session;
+  @override
+  State<CallsScreen> createState() => _CallsScreenState();
+}
+
+class _CallsScreenState extends State<CallsScreen> {
+  Rows rows = [];
+  bool loading = true;
+  int _seenRev = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final r = await context.read<AgentStore>().fetchCalls();
+    if (mounted) setState(() { rows = r; loading = false; });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final rows = [
-      ('in', 'Karim Traders', 'Inbound · 2:14 PM · 6m 12s'),
-      ('miss', '01819 222 410', 'Missed · 1:58 PM · Sales queue'),
-      ('out', 'Nusrat Jahan', 'Outbound · 1:30 PM · 3m 40s'),
-      ('in', 'Dhaka Fabrics Ltd', 'Inbound · 12:05 PM · 9m 02s'),
-    ];
+    // Reload whenever the store reports new data (e.g. a call just ended).
+    final rev = context.select<AgentStore, int>((s) => s.callsRev);
+    if (rev != _seenRev) {
+      _seenRev = rev;
+      WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    }
     return Column(children: [
-      const _Header('Calls'),
+      ScreenTitle('Calls', trailing: IconButton(icon: const Icon(Icons.refresh), onPressed: _load)),
       Expanded(
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: rows.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (_, i) {
-            final (kind, name, meta) = rows[i];
-            final miss = kind == 'miss';
-            final color = miss ? BrandTheme.dnd : (kind == 'out' ? BrandTheme.onCall : BrandTheme.available);
-            final icon = miss ? Icons.call_missed : (kind == 'out' ? Icons.call_made : Icons.call_received);
-            return ListTile(
-              leading: CircleAvatar(backgroundColor: color.withOpacity(.12), child: Icon(icon, color: color, size: 18)),
-              title: Text(name, style: TextStyle(fontWeight: FontWeight.w600, color: miss ? BrandTheme.dnd : null)),
-              subtitle: Text(meta),
-              trailing: IconButton(icon: const Icon(Icons.call, color: BrandTheme.available), onPressed: () {}),
-            );
-          },
-        ),
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : rows.isEmpty
+                ? const EmptyState('No calls yet. Your calls will appear here.', icon: Icons.history)
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) => _tile(context, rows[i]),
+                    ),
+                  ),
       ),
     ]);
   }
-}
 
-class _Header extends StatelessWidget {
-  const _Header(this.title);
-  final String title;
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Align(alignment: Alignment.centerLeft,
-            child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800))),
-      );
+  Widget _tile(BuildContext context, Map<String, dynamic> c) {
+    final dir = '${c['direction']}';
+    final status = '${c['status']}';
+    final miss = dir == 'inbound' && status != 'answered' && status != 'completed' && status != 'connected';
+    final color = miss ? BrandTheme.dnd : (dir == 'outbound' ? BrandTheme.onCall : BrandTheme.available);
+    final icon = miss ? Icons.call_missed : (dir == 'outbound' ? Icons.call_made : Icons.call_received);
+    final dur = int.tryParse('${c['duration'] ?? ''}');
+    final disp = '${c['disposition'] ?? ''}';
+    final meta = [
+      miss ? 'Missed' : (dir == 'outbound' ? 'Outbound' : 'Inbound'),
+      fmtWhen('${c['timestamp']}'),
+      if (dur != null && dur > 0) fmtDur(dur),
+      if (disp.isNotEmpty) disp,
+    ].join(' · ');
+    final number = callTitle(c);
+    return ListTile(
+      leading: CircleAvatar(backgroundColor: color.withOpacity(.12), child: Icon(icon, color: color, size: 18)),
+      title: Text(number.isEmpty ? 'Unknown' : number,
+          style: TextStyle(fontWeight: FontWeight.w600, color: miss ? BrandTheme.dnd : null)),
+      subtitle: Text(meta),
+      trailing: widget.session.can('outbound')
+          ? IconButton(
+              icon: const Icon(Icons.call, color: BrandTheme.available), onPressed: () => dial(context, number))
+          : null,
+    );
+  }
 }

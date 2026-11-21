@@ -4,12 +4,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 import 'core/api_client.dart';
+import 'core/agent_store.dart';
 import 'core/session.dart';
 import 'core/server_config.dart';
 import 'calling/sip_service.dart';
 import 'realtime/realtime_client.dart';
 import 'shell/home_shell.dart';
 import 'screens/connect_screen.dart';
+
+final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +38,7 @@ class CallCenterProApp extends StatelessWidget {
           final b = tc.theme;
           return MaterialApp(
             title: 'CallCenter Pro',
+            navigatorKey: navKey,
             debugShowCheckedModeBanner: false,
             theme: b.light(),
             darkTheme: b.dark(),
@@ -110,8 +114,21 @@ class _LoginScreenState extends State<LoginScreen> {
         displayName: res['extension'] as String?,
       );
       if (!mounted) return;
+      final session = AppSession.fromLogin(res);
+      void signOut() {
+        sip.stop();
+        rt.close();
+        navKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const Gate()), (r) => false);
+      }
       Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => HomeShell(session: AppSession.fromLogin(res)),
+        builder: (_) => ChangeNotifierProvider<AgentStore>(
+          create: (_) => AgentStore(api, session,
+              onSessionExpired: signOut,
+              onTheme: (t) => widget.theme.apply(BrandTheme.fromJson(t)))
+            ..start(),
+          child: _StoreScope(child: HomeShell(session: session, onSignOut: signOut)),
+        ),
       ));
     } on ApiError catch (e) {
       setState(() => error = e.message);
@@ -158,4 +175,32 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+
+/// Stops presence heartbeats and marks the agent offline when the signed-in
+/// area is torn down (sign out or session expiry).
+class _StoreScope extends StatefulWidget {
+  const _StoreScope({required this.child});
+  final Widget child;
+  @override
+  State<_StoreScope> createState() => _StoreScopeState();
+}
+
+class _StoreScopeState extends State<_StoreScope> {
+  late final AgentStore _store;
+  @override
+  void initState() {
+    super.initState();
+    _store = context.read<AgentStore>();
+  }
+
+  @override
+  void dispose() {
+    _store.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

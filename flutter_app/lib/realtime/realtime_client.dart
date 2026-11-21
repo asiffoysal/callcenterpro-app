@@ -33,15 +33,21 @@ class RealtimeClient {
     );
   }
 
+  bool _closed = false;
   bool _reconnecting = false;
   void _scheduleReconnect() {
-    if (_reconnecting) return;
+    if (_reconnecting || _closed) return;
     _reconnecting = true;
     Future.delayed(const Duration(seconds: 3), () {
       _reconnecting = false;
-      connect();
+      if (!_closed) connect();
     });
   }
 
-  void dispose() => _ch?.sink.close();
+  void close() {
+    _closed = true;
+    _ch?.sink.close();
+  }
+
+  void dispose() => close();
 }

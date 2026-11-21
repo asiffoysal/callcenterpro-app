@@ -53,6 +53,35 @@ class ApiClient {
     return body;
   }
 
+  /// Authenticated GET on /app/v1/<path>.
+  Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) async {
+    final uri = _u(path).replace(queryParameters: query);
+    final res = await _client.get(uri, headers: _headers).timeout(const Duration(seconds: 20));
+    return _decode(res);
+  }
+
+  /// Authenticated POST on /app/v1/<path>.
+  Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) async {
+    final res = await _client
+        .post(_u(path), headers: _headers, body: jsonEncode(body ?? {}))
+        .timeout(const Duration(seconds: 20));
+    return _decode(res);
+  }
+
+  Map<String, dynamic> _decode(http.Response res) {
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw ApiError('Unexpected reply from the server (${res.statusCode})', res.statusCode);
+    }
+    if (res.statusCode == 401) throw ApiError('Session expired. Please sign in again.', 401);
+    if (res.statusCode >= 400 || body['success'] == false) {
+      throw ApiError(body['error']?.toString() ?? 'Request failed', res.statusCode);
+    }
+    return body;
+  }
+
   Future<void> registerDevice(Map<String, dynamic> device) async {
     await _client.post(_u('devices/register'), headers: _headers, body: jsonEncode(device));
   }
