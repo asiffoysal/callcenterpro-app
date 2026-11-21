@@ -22,6 +22,7 @@ class ApiClient {
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
+        if (token != null) 'X-App-Token': token!,
       };
 
   Future<Map<String, dynamic>> login({

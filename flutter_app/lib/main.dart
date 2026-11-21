@@ -12,6 +12,9 @@ import 'realtime/realtime_client.dart';
 import 'shell/home_shell.dart';
 import 'screens/connect_screen.dart';
 
+/// Shown on the sign-in screen when the app was sent back there.
+String? gateNotice;
+
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -86,10 +89,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final company = TextEditingController(text: 'Acme Telecom');
   final ext = TextEditingController();
   final pass = TextEditingController();
-  String? error;
+  String? error = gateNotice;
   bool busy = false;
 
   Future<void> _signIn() async {
+    gateNotice = null;
     setState(() { busy = true; error = null; });
     try {
       final api = ApiClient(ServerConfig.baseUrl!);
@@ -115,7 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
       final session = AppSession.fromLogin(res);
+      AgentStore? store;
       void signOut() {
+        gateNotice = 'You were signed out: ${store?.lastError ?? 'session ended'}. Please sign in again.';
         sip.stop();
         rt.close();
         navKey.currentState?.pushAndRemoveUntil(
@@ -123,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => ChangeNotifierProvider<AgentStore>(
-          create: (_) => AgentStore(api, session,
+          create: (_) => store = AgentStore(api, session,
               onSessionExpired: signOut,
               onTheme: (t) => widget.theme.apply(BrandTheme.fromJson(t)))
             ..start(),
@@ -131,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ));
     } on ApiError catch (e) {
+      gateNotice = null;
       setState(() => error = e.message);
     } catch (_) {
       setState(() => error = 'Could not reach the server. Check the address.');
