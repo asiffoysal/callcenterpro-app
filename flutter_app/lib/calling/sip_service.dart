@@ -54,8 +54,8 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     await helper.start(s);
   }
 
-  Future<void> stop() async {
-    try { await helper.stop(); } catch (_) {}
+  void stop() {
+    try { helper.stop(); } catch (_) {}
   }
 
   void placeCall(String target) {
