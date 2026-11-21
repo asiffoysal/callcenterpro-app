@@ -13,8 +13,7 @@ dependencies:
   web_socket_channel: ^3.0.0
   provider: ^6.1.0
   shared_preferences: ^2.3.0
-  sip_ua: ^1.0.0            # SIP over WSS to the call engine
-  flutter_webrtc: ^0.11.7   # audio (Opus) + ICE
+  sip_ua: ^1.1.0            # SIP over WSS to the call engine (pulls flutter_webrtc itself)
   permission_handler: ^11.3.1
 
 dev_dependencies:
