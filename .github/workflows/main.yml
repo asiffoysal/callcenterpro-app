@@ -43,8 +43,10 @@ jobs:
               print("permissions already present")
           PY
       - run: flutter pub get
-      - run: flutter build apk --release
+      # Per-CPU APKs: each is ~half the size of a universal one. Install the
+      # arm64-v8a build on modern phones.
+      - run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
           name: callcenterpro-apk
-          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-*-release.apk
