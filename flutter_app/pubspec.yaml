@@ -1,0 +1,29 @@
+name: callcenterpro
+description: CallCenter Pro agent app (Android, iOS, Windows, macOS).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0                 # REST calls to /app/v1
+  web_socket_channel: ^3.0.0  # realtime hub (theme.update, call events)
+  provider: ^6.1.0            # state + live theme
+  shared_preferences: ^2.3.0  # persist token + last theme
+
+  # --- Added in later build stages (calling, push, device) ---
+  # sip_ua: ^1.1.0            # SIP over WSS
+  # flutter_webrtc: ^0.12.0   # audio (Opus) + ICE restart
+  # flutter_callkit_incoming: ^2.5.0  # iOS CallKit / Android full-screen call
+  # firebase_messaging: ^15.0.0       # FCM push (Android)
+  # permission_handler: ^11.3.0
+  # geolocator: ^12.0.0       # location while signed in
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
