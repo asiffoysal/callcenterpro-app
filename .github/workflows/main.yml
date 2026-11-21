@@ -19,6 +19,29 @@ jobs:
         with:
           channel: stable
       - run: flutter create --org com.callcenterpro --project-name callcenterpro --platforms=android .
+      - name: Add calling permissions to Android manifest
+        run: |
+          python3 - android/app/src/main/AndroidManifest.xml <<'PY'
+          import sys, re
+          p = sys.argv[1]
+          s = open(p).read()
+          perms = (
+              '    <uses-permission android:name="android.permission.INTERNET"/>\n'
+              '    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n'
+              '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n'
+              '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n'
+              '    <uses-permission android:name="android.permission.BLUETOOTH"/>\n'
+              '    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n'
+              '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n'
+              '    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n'
+          )
+          if 'RECORD_AUDIO' not in s:
+              s = re.sub(r'(<manifest[^>]*>)', r'\1\n' + perms, s, count=1)
+              open(p, 'w').write(s)
+              print("permissions added")
+          else:
+              print("permissions already present")
+          PY
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4

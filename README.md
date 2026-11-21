@@ -45,4 +45,3 @@ Set `kServerBase` and `kHubUrl` in `lib/main.dart` to your server.
 - Personal phone contacts and the device gallery are never uploaded. Work
   photos are captured inside the app (Stage 5).
 
-<!-- build check 2026-11-21T08:49:55Z -->

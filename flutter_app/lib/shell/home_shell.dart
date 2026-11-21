@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/session.dart';
+import '../calling/sip_service.dart';
 import '../screens/home_screen.dart';
 import '../screens/calls_screen.dart';
 import '../screens/keypad_screen.dart';
 import '../screens/team_screen.dart';
 import '../screens/more_screen.dart';
+import '../screens/incall_screen.dart';
 
 /// The main app shell after sign-in: bottom navigation matching the mockups
 /// (Home, Calls, Keypad, Team, More). Each tab keeps its state via IndexedStack.
@@ -29,7 +32,7 @@ class _HomeShellState extends State<HomeShell> {
       TeamScreen(session: s),
       MoreScreen(session: s),
     ];
-    return Scaffold(
+    final scaffold = Scaffold(
       body: SafeArea(bottom: false, child: IndexedStack(index: _tab, children: pages)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
@@ -42,6 +45,13 @@ class _HomeShellState extends State<HomeShell> {
           NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
         ],
       ),
+    );
+    // Show the call screen over everything whenever there's an active call.
+    return Consumer<SipService>(
+      builder: (context, sip, _) => Stack(children: [
+        scaffold,
+        if (sip.hasCall) const Positioned.fill(child: InCallScreen()),
+      ]),
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../core/session.dart';
+import '../calling/sip_service.dart';
 import '../theme/app_theme.dart';
 
 class KeypadScreen extends StatefulWidget {
@@ -49,7 +52,13 @@ class _KeypadScreenState extends State<KeypadScreen> {
           FloatingActionButton(
             heroTag: 'call',
             backgroundColor: BrandTheme.available,
-            onPressed: widget.session.can('outbound') ? () {} : null,
+            onPressed: (widget.session.can('outbound') && _n.isNotEmpty)
+                ? () async {
+                    await Permission.microphone.request();
+                    if (!context.mounted) return;
+                    context.read<SipService>().placeCall(_n);
+                  }
+                : null,
             child: const Icon(Icons.call, color: Colors.white),
           ),
           const SizedBox(width: 24),

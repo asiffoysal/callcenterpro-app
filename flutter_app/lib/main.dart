@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 import 'core/api_client.dart';
 import 'core/session.dart';
 import 'core/server_config.dart';
+import 'calling/sip_service.dart';
 import 'realtime/realtime_client.dart';
 import 'shell/home_shell.dart';
 import 'screens/connect_screen.dart';
@@ -23,8 +25,11 @@ class CallCenterProApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: theme,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: theme),
+        ChangeNotifierProvider(create: (_) => SipService()),
+      ],
       child: Consumer<ThemeController>(
         builder: (context, tc, _) {
           final b = tc.theme;
@@ -94,6 +99,16 @@ class _LoginScreenState extends State<LoginScreen> {
       final rt = RealtimeClient(hubUrl: ServerConfig.hubUrl, token: res['token'] as String);
       rt.on('theme.update', widget.theme.onRealtimeThemeUpdate);
       rt.connect();
+      // Register the extension to the call engine so the app can make/receive calls.
+      await Permission.microphone.request();
+      final sip = context.read<SipService>();
+      final host = Uri.parse(ServerConfig.baseUrl!).host;
+      await sip.start(
+        host: host,
+        sipUser: res['sip_username'] as String? ?? '',
+        password: res['sip_password'] as String? ?? '',
+        displayName: res['extension'] as String?,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => HomeShell(session: AppSession.fromLogin(res)),
