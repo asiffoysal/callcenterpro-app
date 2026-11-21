@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 /// Thin REST client for the /app/v1 API.
 /// baseUrl is your server, e.g. https://cc.aitoyes.com
@@ -7,6 +9,13 @@ class ApiClient {
   ApiClient(this.baseUrl, {this.token});
   final String baseUrl;
   String? token;
+
+  // Tolerate a self-signed certificate on the call center server so the app
+  // can connect for testing. For production, install a real certificate
+  // (Let's Encrypt) and this simply has no effect.
+  static final http.Client _client = IOClient(
+    HttpClient()..badCertificateCallback = (cert, host, port) => true,
+  );
 
   Uri _u(String path) => Uri.parse('$baseUrl/app/v1/$path');
 
@@ -21,7 +30,7 @@ class ApiClient {
     required String password,
     Map<String, dynamic>? device,
   }) async {
-    final res = await http.post(_u('login'),
+    final res = await _client.post(_u('login'),
         headers: _headers,
         body: jsonEncode({
           'company': company,
@@ -38,14 +47,14 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> bootstrap() async {
-    final res = await http.get(_u('bootstrap'), headers: _headers);
+    final res = await _client.get(_u('bootstrap'), headers: _headers);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) throw ApiError(body['error']?.toString() ?? 'Failed', res.statusCode);
     return body;
   }
 
   Future<void> registerDevice(Map<String, dynamic> device) async {
-    await http.post(_u('devices/register'), headers: _headers, body: jsonEncode(device));
+    await _client.post(_u('devices/register'), headers: _headers, body: jsonEncode(device));
   }
 }
 
