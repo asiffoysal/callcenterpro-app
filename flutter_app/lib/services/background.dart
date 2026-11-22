@@ -21,6 +21,7 @@ class Background {
       ),
       iosNotificationOptions: const IOSNotificationOptions(showNotification: false),
       foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.nothing(),
         allowWakeLock: true,
         allowWifiLock: true,
       ),
