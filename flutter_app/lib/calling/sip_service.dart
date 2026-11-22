@@ -224,7 +224,8 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
 
   @override
   void transportStateChanged(TransportState state) {
-    trace('Connection: ${state.state.name}XX.DISCONNECTED) {
+    trace('Connection: ${state.state.name}');
+    if (state.state == TransportStateEnum.DISCONNECTED) {
       registered = false;
       notifyListeners();
     }
