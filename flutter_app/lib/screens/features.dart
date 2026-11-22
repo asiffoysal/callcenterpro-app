@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../core/server_config.dart';
 import 'package:provider/provider.dart';
 import '../core/agent_store.dart';
+import '../calling/sip_service.dart';
 import '../core/fmt.dart';
 import '../core/session.dart';
 import '../theme/app_theme.dart';
@@ -368,6 +371,12 @@ class SettingsScreen extends StatelessWidget {
         child: ListView(children: [
           ListTile(leading: const Icon(Icons.business), title: Text(session.company), subtitle: const Text('Company')),
           ListTile(leading: const Icon(Icons.dialpad), title: Text('Extension ${session.extension}')),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Call diagnostics'),
+            subtitle: const Text('Phone line status and error log'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DiagnosticsScreen())),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: BrandTheme.dnd),
@@ -379,4 +388,62 @@ class SettingsScreen extends StatelessWidget {
           ),
         ]),
       );
+}
+
+
+/// ---------------- Call diagnostics ----------------
+class DiagnosticsScreen extends StatelessWidget {
+  const DiagnosticsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final sip = context.watch<SipService>();
+    final ok = sip.registered;
+    return SubPage(
+      title: 'Call diagnostics',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.copy),
+          tooltip: 'Copy log',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: sip.log.join('\n')));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Log copied')));
+          },
+        ),
+      ],
+      child: Column(children: [
+        ListTile(
+          leading: Icon(ok ? Icons.check_circle : Icons.error_outline,
+              color: ok ? BrandTheme.available : BrandTheme.dnd),
+          title: Text(ok ? 'Phone line connected' : 'Phone line NOT connected'),
+          subtitle: Text(ok ? 'You can make and receive calls.' : (sip.lastError.isNotEmpty ? sip.lastError : 'Waiting…')),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.network_check),
+                label: const Text('Test server port'),
+                onPressed: () async {
+                  final host = Uri.parse(ServerConfig.baseUrl ?? '').host;
+                  final r = await sip.testConnection(host);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r)));
+                },
+              ),
+            ),
+          ]),
+        ),
+        const Divider(),
+        Expanded(
+          child: ListView.builder(
+            reverse: true,
+            padding: const EdgeInsets.all(12),
+            itemCount: sip.log.length,
+            itemBuilder: (_, i) => Text(sip.log[sip.log.length - 1 - i],
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          ),
+        ),
+      ]),
+    );
+  }
 }

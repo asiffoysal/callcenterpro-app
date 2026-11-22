@@ -50,7 +50,7 @@ class InCallScreen extends StatelessWidget {
                     () => context.read<SipService>().toggleMute(), active: sip.muted),
                 _round(context, Icons.pause, sip.onHold ? 'Resume' : 'Hold',
                     () => context.read<SipService>().toggleHold(), active: sip.onHold),
-                _round(context, Icons.volume_up, 'Speaker', () {}),
+                _round(context, Icons.volume_up, 'Speaker', () => context.read<SipService>().toggleSpeaker(), active: sip.speaker),
               ]),
             const SizedBox(height: 28),
             if (incomingRinging)

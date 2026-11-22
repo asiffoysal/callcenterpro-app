@@ -103,7 +103,10 @@ class HomeScreen extends StatelessWidget {
   Widget _phoneLine(BuildContext context, SipService sip) {
     final ok = sip.registered;
     final c = ok ? BrandTheme.available : BrandTheme.onBreak;
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DiagnosticsScreen())),
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(color: c.withOpacity(.10), borderRadius: BorderRadius.circular(12)),
       child: Row(children: [
@@ -114,8 +117,9 @@ class HomeScreen extends StatelessWidget {
               ok ? 'Phone line connected' : (sip.lastError.isNotEmpty ? 'Phone line: ${sip.lastError}' : 'Connecting phone line…'),
               style: TextStyle(color: c, fontWeight: FontWeight.w600, fontSize: 13)),
         ),
+        Icon(Icons.chevron_right, size: 18, color: c),
       ]),
-    );
+    ));
   }
 
   void _statusSheet(BuildContext context, AgentStore store) {
