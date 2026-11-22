@@ -4,6 +4,10 @@ import '../core/agent_store.dart';
 import '../core/session.dart';
 import '../widgets/common.dart';
 import 'features.dart';
+import 'chat.dart';
+import 'sms.dart';
+import 'recordings.dart';
+import 'work_camera.dart';
 
 /// The More tab. Each item is gated by a permission, so anything the admin
 /// turned off for this agent simply does not appear.
@@ -16,11 +20,15 @@ class MoreScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = context.watch<AgentStore>();
     final items = <(String, IconData, String, WidgetBuilder, int)>[
+      ('Team chat', Icons.chat_bubble_outline, 'chat', (_) => const ChatListScreen(), store.chatUnread),
       ('Callbacks', Icons.history_toggle_off, 'callbacks', (_) => const CallbacksScreen(), store.dueCallbacks),
       ('Queue', Icons.format_list_numbered, 'queue', (_) => const QueueScreen(), 0),
       ('Scripts', Icons.description_outlined, 'scripts', (_) => const ScriptsScreen(), 0),
       ('Phonebook', Icons.menu_book_outlined, 'phonebook', (_) => const PhonebookScreen(), 0),
       ('Notices', Icons.notifications_outlined, 'notices', (_) => const NoticesScreen(), store.unreadNotices),
+      ('SMS', Icons.sms_outlined, 'sms', (_) => const SmsScreen(), 0),
+      ('Recordings', Icons.mic_none, 'recordings', (_) => const RecordingsScreen(), 0),
+      ('Work photo', Icons.photo_camera_outlined, 'mobile_data', (_) => const WorkCameraScreen(), 0),
       ('My summary', Icons.insights_outlined, 'summary', (_) => const SummaryScreen(), 0),
     ].where((e) => session.can(e.$3)).toList();
 

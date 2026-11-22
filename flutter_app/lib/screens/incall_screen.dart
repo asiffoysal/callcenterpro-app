@@ -1,21 +1,67 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sip_ua/sip_ua.dart';
 import '../calling/sip_service.dart';
+import '../core/agent_store.dart';
+import '../core/fmt.dart';
+import '../core/session.dart';
+import 'crm_form.dart';
+import 'transfer_sheet.dart';
 
 /// Full-screen call UI shown (as an overlay) whenever there is an active call,
 /// for both incoming and outgoing. Reads live state from SipService.
-class InCallScreen extends StatelessWidget {
-  const InCallScreen({super.key});
+class InCallScreen extends StatefulWidget {
+  const InCallScreen({super.key, required this.session});
+  final AppSession session;
+  @override
+  State<InCallScreen> createState() => _InCallScreenState();
+}
+
+class _InCallScreenState extends State<InCallScreen> {
+  Map<String, dynamic>? form;
+  String _lookedUp = '';
+  Timer? _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    // Re-draw once a second so the call timer counts up.
+    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  /// Once we know who is on the line, ask the server whether the company has
+  /// a customer-info form for this call.
+  void _lookup(SipService sip) {
+    if (!widget.session.can('crm_forms')) return;
+    final peer = cleanNumber(sip.remoteNumber);
+    if (peer.isEmpty || peer == _lookedUp) return;
+    _lookedUp = peer;
+    final dir = sip.incoming ? 'inbound' : 'outbound';
+    lookupCallForm(context.read<AgentStore>().api, peer, dir).then((f) {
+      if (mounted) setState(() => form = f);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final sip = context.watch<SipService>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _lookup(sip);
+    });
     final incomingRinging = sip.incoming && sip.state == CallStateEnum.PROGRESS;
 
     String status;
     if (sip.connected) {
-      status = 'In call';
+      status = 'In call  ·  ${fmtClock2(sip.talkSeconds)}';
     } else if (incomingRinging) {
       status = 'Incoming call';
     } else if (sip.ringing) {
@@ -44,6 +90,27 @@ class InCallScreen extends StatelessWidget {
             Text(sip.remoteNumber.isEmpty ? 'Unknown' : sip.remoteNumber,
                 style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
             const Spacer(),
+            if (sip.connected || sip.ringing)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Wrap(spacing: 10, children: [
+                  if (form != null)
+                    ActionChip(
+                      avatar: const Icon(Icons.assignment_outlined, size: 18),
+                      label: const Text('Client info'),
+                      onPressed: () => showCallFormSheet(context,
+                          form: form!,
+                          peer: cleanNumber(sip.remoteNumber),
+                          direction: sip.incoming ? 'inbound' : 'outbound'),
+                    ),
+                  if (sip.connected && widget.session.can('transfer'))
+                    ActionChip(
+                      avatar: const Icon(Icons.phone_forwarded, size: 18),
+                      label: const Text('Transfer'),
+                      onPressed: () => showTransferSheet(context, widget.session),
+                    ),
+                ]),
+              ),
             if (sip.connected)
               Wrap(spacing: 28, runSpacing: 20, alignment: WrapAlignment.center, children: [
                 _round(context, sip.muted ? Icons.mic_off : Icons.mic, sip.muted ? 'Unmute' : 'Mute',
@@ -103,4 +170,10 @@ class InCallScreen extends StatelessWidget {
       Text(label, style: const TextStyle(color: Color(0xFFC9CDEA), fontSize: 14)),
     ]);
   }
+}
+
+String fmtClock2(int seconds) {
+  final m = (seconds ~/ 60).toString().padLeft(2, '0');
+  final s = (seconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
 }

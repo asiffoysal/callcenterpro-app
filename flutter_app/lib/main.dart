@@ -111,14 +111,29 @@ class _LoginScreenState extends State<LoginScreen> {
       await Permission.microphone.request();
       final sip = context.read<SipService>();
       final host = Uri.parse(ServerConfig.baseUrl!).host;
+      final session = AppSession.fromLogin(res);
+      // Turn the server's STUN/TURN list into one entry per URL.
+      final ice = <Map<String, String>>[];
+      for (final srv in session.iceServers) {
+        final urls = srv['urls'];
+        final list = urls is List ? urls.map((e) => '$e').toList() : ['$urls'];
+        for (final u in list) {
+          if (u.startsWith('stun:stun.l.google.com')) continue; // already built in
+          ice.add({
+            'urls': u,
+            if (srv['username'] != null) 'username': '${srv['username']}',
+            if (srv['credential'] != null) 'credential': '${srv['credential']}',
+          });
+        }
+      }
       await sip.start(
         host: host,
         sipUser: res['sip_username'] as String? ?? '',
         password: res['sip_password'] as String? ?? '',
         displayName: res['extension'] as String?,
+        extraIce: ice,
       );
       if (!mounted) return;
-      final session = AppSession.fromLogin(res);
       AgentStore? store;
       void signOut() {
         gateNotice = 'You were signed out: ${store?.lastError ?? 'session ended'}. Please sign in again.';

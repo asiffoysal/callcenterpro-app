@@ -330,8 +330,31 @@ class NoticesScreen extends StatelessWidget {
 }
 
 /// ---------------- Summary ----------------
-class SummaryScreen extends StatelessWidget {
+class SummaryScreen extends StatefulWidget {
   const SummaryScreen({super.key});
+  @override
+  State<SummaryScreen> createState() => _SummaryScreenState();
+}
+
+class _SummaryScreenState extends State<SummaryScreen> {
+  Rows top = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRank();
+  }
+
+  Future<void> _loadRank() async {
+    try {
+      final r = await context.read<AgentStore>().api.legacyGet('agentrank/today');
+      final list = (r['rankings'] as List? ?? const [])
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList();
+      if (mounted) setState(() => top = list);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AgentStore>();
@@ -343,8 +366,27 @@ class SummaryScreen extends StatelessWidget {
     return SubPage(
       title: 'My summary (today)',
       child: RefreshIndicator(
-        onRefresh: () => store.refreshAll(),
+        onRefresh: () async { await store.refreshAll(); await _loadRank(); },
         child: ListView(padding: const EdgeInsets.all(12), children: [
+          if (top.isNotEmpty) ...[
+            const Padding(
+                padding: EdgeInsets.fromLTRB(4, 4, 4, 6),
+                child: Text('Top agents today', style: TextStyle(fontWeight: FontWeight.w800))),
+            for (var i = 0; i < top.length; i++)
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(child: Text('${i + 1}')),
+                  title: Text('${top[i]['display_name']}'.isEmpty
+                      ? 'Ext ${top[i]['extension']}'
+                      : '${top[i]['display_name']}'),
+                  subtitle: Text('Ext ${top[i]['extension']}'
+                      '${'${top[i]['extension']}' == store.session.extension ? '  ·  you' : ''}'),
+                  trailing: Text('${top[i]['total_calls']} calls',
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
           tile('Total calls', '${s['total'] ?? 0}', Icons.call),
           tile('Inbound', '${s['inbound'] ?? 0}', Icons.call_received),
           tile('Outbound', '${s['outbound'] ?? 0}', Icons.call_made),

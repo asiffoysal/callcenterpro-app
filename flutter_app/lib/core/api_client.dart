@@ -10,6 +10,18 @@ class ApiClient {
   final String baseUrl;
   String? token;
 
+  // Credentials for the company's classic /api endpoints (team chat, CRM
+  // forms, SMS, call transfer). Filled in after sign-in.
+  int tenantId = 0;
+  String extension = '';
+  String agentToken = '';
+
+  void useAgent(int tid, String ext, String agentTok) {
+    tenantId = tid;
+    extension = ext;
+    agentToken = agentTok;
+  }
+
   // Tolerate a self-signed certificate on the call center server so the app
   // can connect for testing. For production, install a real certificate
   // (Let's Encrypt) and this simply has no effect.
@@ -81,6 +93,51 @@ class ApiClient {
       throw ApiError(body['error']?.toString() ?? 'Request failed', res.statusCode);
     }
     return body;
+  }
+
+  Map<String, String> get _legacyHeaders => {
+        'Content-Type': 'application/json',
+        'X-Agent-Token': agentToken,
+      };
+
+  /// GET on the company's /api/<path> (chat, forms, sms...). tenant_id,
+  /// extension and the agent token are added automatically.
+  Future<Map<String, dynamic>> legacyGet(String path, {Map<String, String>? query}) async {
+    final q = <String, String>{
+      'tenant_id': '$tenantId',
+      'extension': extension,
+      ...?query,
+    };
+    final uri = Uri.parse('$baseUrl/api/$path').replace(queryParameters: q);
+    final res = await _client.get(uri, headers: _legacyHeaders).timeout(const Duration(seconds: 20));
+    return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> legacyPost(String path, [Map<String, dynamic>? body]) async {
+    final b = <String, dynamic>{
+      'tenant_id': tenantId,
+      'extension': extension,
+      ...?body,
+    };
+    final res = await _client
+        .post(Uri.parse('$baseUrl/api/$path'), headers: _legacyHeaders, body: jsonEncode(b))
+        .timeout(const Duration(seconds: 25));
+    return _decode(res);
+  }
+
+  /// Uploads a file as multipart/form-data to /app/v1/<path>.
+  Future<Map<String, dynamic>> upload(String path, String field, String filePath,
+      {Map<String, String>? fields}) async {
+    final req = http.MultipartRequest('POST', _u(path));
+    if (token != null) {
+      req.headers['Authorization'] = 'Bearer $token';
+      req.headers['X-App-Token'] = token!;
+    }
+    req.fields.addAll(fields ?? {});
+    req.files.add(await http.MultipartFile.fromPath(field, filePath));
+    final streamed = await _client.send(req).timeout(const Duration(seconds: 60));
+    final res = await http.Response.fromStream(streamed);
+    return _decode(res);
   }
 
   Future<void> registerDevice(Map<String, dynamic> device) async {

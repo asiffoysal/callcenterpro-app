@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_webrtc/flutter_webrtc.dart' show Helper;
 import 'package:sip_ua/sip_ua.dart';
@@ -38,6 +39,8 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
   // remembered so we can re-register after a network drop
   String? _host, _sipUser, _password, _display;
   Timer? _watchdog;
+  Timer? _ringTimer;
+  List<Map<String, String>> _extraIce = const [];
   DateTime _lastStart = DateTime.fromMillisecondsSinceEpoch(0);
 
   void trace(String m) {
@@ -72,6 +75,8 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
   String get lastError => _lastError;
 
   CallStateEnum get state => _state;
+  int get talkSeconds =>
+      _connectedAt == null ? 0 : DateTime.now().difference(_connectedAt!).inSeconds;
   bool get hasCall =>
       _call != null && _state != CallStateEnum.ENDED && _state != CallStateEnum.FAILED;
   bool get connected => _state == CallStateEnum.CONFIRMED;
@@ -89,6 +94,7 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     List<Map<String, String>> extraIce = const [],
   }) async {
     _host = host; _sipUser = sipUser; _password = password; _display = displayName;
+    _extraIce = extraIce;
     _lastStart = DateTime.now();
     trace('Starting phone line: sip:$sipUser@$host via wss://$host:8089/ws');
     final s = UaSettings();
@@ -121,10 +127,27 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     if (registered || hasCall || _host == null) return;
     if (DateTime.now().difference(_lastStart).inSeconds < 20) return;
     trace('Phone line is not registered - reconnecting');
-    start(host: _host!, sipUser: _sipUser!, password: _password!, displayName: _display);
+    start(host: _host!, sipUser: _sipUser!, password: _password!, displayName: _display, extraIce: _extraIce);
+  }
+
+  /// Rings and vibrates while an incoming call waits to be answered.
+  void _ringOn() {
+    if (_ringTimer != null) return;
+    void beat() {
+      HapticFeedback.vibrate();
+      SystemSound.play(SystemSoundType.alert);
+    }
+    beat();
+    _ringTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) => beat());
+  }
+
+  void _ringOff() {
+    _ringTimer?.cancel();
+    _ringTimer = null;
   }
 
   void stop() {
+    _ringOff();
     _watchdog?.cancel();
     _host = null;
     registered = false;
@@ -180,6 +203,11 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     if (id != null && id.isNotEmpty) remoteNumber = id;
     if (_state == CallStateEnum.CALL_INITIATION || _state == CallStateEnum.PROGRESS) {
       _ended = false;
+    }
+    if (incoming && _state == CallStateEnum.PROGRESS) {
+      _ringOn();
+    } else {
+      _ringOff();
     }
     if (_state == CallStateEnum.CONFIRMED && prevState != CallStateEnum.CONFIRMED) {
       _connectedAt = DateTime.now();

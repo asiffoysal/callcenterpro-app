@@ -15,6 +15,10 @@ dependencies:
   shared_preferences: ^2.3.0
   sip_ua: ^1.1.0            # SIP over WSS to the call engine (pulls flutter_webrtc itself)
   permission_handler: ^11.3.1
+  url_launcher: ^6.3.0
+  image_picker: ^1.1.2
+  geolocator: ^13.0.2
+  flutter_foreground_task: ^8.10.0   # keeps the phone line alive in the background
 
 dev_dependencies:
   flutter_lints: ^4.0.0
